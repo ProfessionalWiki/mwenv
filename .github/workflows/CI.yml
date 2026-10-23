@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+    tags:
+      - 'v*'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: test -z "$(gofmt -l .)"
+      - run: go vet ./...
+      - run: go test ./...
+
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: go build -o "$RUNNER_TEMP/mwenv" ./cmd/mwenv
+      - name: Create an extension
+        run: |
+          mkdir "$RUNNER_TEMP/SmokeTest"
+          cd "$RUNNER_TEMP/SmokeTest"
+          git init -q
+          echo '{ "name": "Smoke Test", "manifest_version": 2 }' > extension.json
+      - name: Start, use and destroy an environment
+        working-directory: ${{ runner.temp }}/SmokeTest
+        run: |
+          "$RUNNER_TEMP/mwenv" start
+          wiki=$("$RUNNER_TEMP/mwenv" status --json | jq -r '.url | sub("/wiki/Main_Page$"; "")')
+          curl -fsS "$wiki/wiki/Special:Version" | grep -q 'Smoke Test'
+          curl -sS "$wiki/w/rest.php/v1/page/Foo%2FBar" | jq -e '.httpCode == 404'
+          "$RUNNER_TEMP/mwenv" run -- php ../../maintenance/run.php showSiteStats
+          "$RUNNER_TEMP/mwenv" destroy
+          test "$("$RUNNER_TEMP/mwenv" ls --json)" = "[]"
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [test, smoke]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Build binaries
+        run: |
+          for target in darwin/amd64 darwin/arm64 linux/amd64 linux/arm64; do
+            GOOS=${target%/*} GOARCH=${target#*/} CGO_ENABLED=0 \
+              go build -trimpath -ldflags='-s -w' -o "dist/mwenv-${target%/*}-${target#*/}" ./cmd/mwenv
+          done
+      - name: Create release
+        run: gh release create "$GITHUB_REF_NAME" dist/* --generate-notes
+        env:
+          GH_TOKEN: ${{ github.token }}
