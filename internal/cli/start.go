@@ -186,6 +186,8 @@ func (a app) create(id string, p project.Project, options startOptions) (environ
 }
 
 func (a app) record(env *environment.Env, p project.Project, image string) error {
+	engine := docker.DetectEngine()
+
 	lock, err := a.store.LockPorts()
 	if err != nil {
 		return err
@@ -197,7 +199,7 @@ func (a app) record(env *environment.Env, p project.Project, image string) error
 		return err
 	}
 
-	composeFile, err := docker.ComposeFile(*env, p, image, a.user)
+	composeFile, err := docker.ComposeFile(*env, p, image, a.user, engine)
 	if err != nil {
 		return err
 	}

@@ -4,7 +4,7 @@ mwenv starts a disposable MediaWiki for the extension or skin in the current git
 containers, database and port, so you can run several at once, for example one per coding agent. The worktree is the
 live code: edits show on the next reload.
 
-You need Docker and git.
+You need Docker or Podman, and git.
 
 ## Install
 

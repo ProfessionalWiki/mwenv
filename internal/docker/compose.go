@@ -39,7 +39,7 @@ func MountPath(p project.Project) string {
 	return InstallPath + "/" + p.Dir()
 }
 
-func ComposeFile(env environment.Env, p project.Project, image string, user User) ([]byte, error) {
+func ComposeFile(env environment.Env, p project.Project, image string, user User, engine Engine) ([]byte, error) {
 	volumes := []map[string]any{
 		{"type": "bind", "source": p.Root, "target": MountPath(p)},
 		{"type": "volume", "source": "composer-cache", "target": "/composer-cache"},
@@ -55,10 +55,20 @@ func ComposeFile(env environment.Env, p project.Project, image string, user User
 		"command": []string{"sh", "-c", addUserCommand(user) + " && exec apache2-foreground"},
 		"ports":   []string{fmt.Sprintf("127.0.0.1:%d:80", env.Port)},
 		"volumes": volumes,
+		// SELinux denies containers the bind mounts. Relabelling them instead would change the labels of the
+		// developer's own files.
+		"security_opt": []string{"label=disable"},
 		"environment": map[string]string{
 			"APACHE_RUN_USER":  fmt.Sprintf("#%d", user.UID),
 			"APACHE_RUN_GROUP": fmt.Sprintf("#%d", user.GID),
 		},
+	}
+
+	// Rootless Podman maps container users to other host users, so the container could not write to the worktree.
+	// keep-id maps the host user to itself, but also starts the container as that user, which cannot bind port 80.
+	if engine == Podman {
+		web["userns_mode"] = "keep-id"
+		web["user"] = "0:0"
 	}
 
 	services := map[string]any{"web": web}
@@ -117,12 +127,27 @@ func (c Compose) args(args ...string) []string {
 }
 
 func (c Compose) Up() error {
-	if _, err := output("volume", "create", composerCacheVolume); err != nil {
+	if err := createComposerCacheVolume(); err != nil {
 		return err
 	}
 
 	_, err := output(c.args("up", "--detach", "--wait", "--quiet-pull")...)
 	return err
+}
+
+// createComposerCacheVolume accepts an existing volume, as docker volume create does and podman volume create does
+// not. Checking only after a failed create keeps parallel starts from racing.
+func createComposerCacheVolume() error {
+	_, err := output("volume", "create", composerCacheVolume)
+	if err != nil && volumeExists(composerCacheVolume) {
+		return nil
+	}
+	return err
+}
+
+func volumeExists(name string) bool {
+	_, err := output("volume", "inspect", name)
+	return err == nil
 }
 
 func (c Compose) Start() error {

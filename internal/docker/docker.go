@@ -57,6 +57,26 @@ func passthrough(args ...string) (int, error) {
 	return 0, err
 }
 
+type Engine string
+
+const (
+	Docker Engine = "docker"
+	Podman Engine = "podman"
+)
+
+// DetectEngine finds Podman both when the docker command is Podman and when it is Docker using Podman's socket.
+func DetectEngine() Engine {
+	version, _ := output("version")
+	return engineFromVersion(version)
+}
+
+func engineFromVersion(version string) Engine {
+	if strings.Contains(version, "Podman Engine") {
+		return Podman
+	}
+	return Docker
+}
+
 // WebContainerStates maps Compose project names to the Docker state of their web container.
 func WebContainerStates() (map[string]string, error) {
 	listing, err := output(

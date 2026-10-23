@@ -2,6 +2,7 @@ package docker_test
 
 import (
 	"encoding/json"
+	"slices"
 	"testing"
 
 	"github.com/ProfessionalWiki/mwenv/internal/docker"
@@ -13,6 +14,9 @@ type composeFile struct {
 	Services map[string]struct {
 		Environment map[string]string `json:"environment"`
 		Ports       []string          `json:"ports"`
+		SecurityOpt []string          `json:"security_opt"`
+		UsernsMode  string            `json:"userns_mode"`
+		User        string            `json:"user"`
 		Volumes     []struct {
 			Source   string `json:"source"`
 			Target   string `json:"target"`
@@ -71,6 +75,32 @@ func TestApacheRunsAsContainerUser(t *testing.T) {
 	assertSame(t, "#501", file.Services["web"].Environment["APACHE_RUN_USER"])
 }
 
+func TestWebContainerDisablesSELinuxLabels(t *testing.T) {
+	file := compose(t, newEnv("mariadb"), pageApprovals(""))
+
+	if !slices.Contains(file.Services["web"].SecurityOpt, "label=disable") {
+		t.Errorf("expected label=disable, got %v", file.Services["web"].SecurityOpt)
+	}
+}
+
+func TestPodmanMapsHostUserToItself(t *testing.T) {
+	file := composeWith(t, newEnv("mariadb"), pageApprovals(""), docker.Podman)
+
+	assertSame(t, "keep-id", file.Services["web"].UsernsMode)
+}
+
+func TestPodmanStartsWebContainerAsRoot(t *testing.T) {
+	file := composeWith(t, newEnv("mariadb"), pageApprovals(""), docker.Podman)
+
+	assertSame(t, "0:0", file.Services["web"].User)
+}
+
+func TestDockerKeepsDefaultUserNamespace(t *testing.T) {
+	file := compose(t, newEnv("mariadb"), pageApprovals(""))
+
+	assertSame(t, "", file.Services["web"].UsernsMode)
+}
+
 func TestHostUserRunsAsItselfInContainer(t *testing.T) {
 	assertSame(t, docker.User{UID: 501, GID: 20}, docker.ContainerUser(501, 20))
 }
@@ -94,8 +124,13 @@ func pageApprovals(externalGitDir string) project.Project {
 
 func compose(t *testing.T, env environment.Env, p project.Project) composeFile {
 	t.Helper()
+	return composeWith(t, env, p, docker.Docker)
+}
 
-	content, err := docker.ComposeFile(env, p, "mwenv-core:test", docker.User{UID: 501, GID: 20})
+func composeWith(t *testing.T, env environment.Env, p project.Project, engine docker.Engine) composeFile {
+	t.Helper()
+
+	content, err := docker.ComposeFile(env, p, "mwenv-core:test", docker.User{UID: 501, GID: 20}, engine)
 	if err != nil {
 		t.Fatal(err)
 	}
