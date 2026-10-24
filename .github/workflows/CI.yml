@@ -62,6 +62,8 @@ jobs:
           curl -fsS "$wiki/wiki/Special:Version" | grep -q 'Smoke Test'
           curl -sS "$wiki/w/rest.php/v1/page/Foo%2FBar" | jq -e '.httpCode == 404'
           "$RUNNER_TEMP/mwenv" run -- php ../../maintenance/run.php showSiteStats
+          "$RUNNER_TEMP/mwenv" stop
+          "$RUNNER_TEMP/mwenv" start
           "$RUNNER_TEMP/mwenv" destroy
           test "$("$RUNNER_TEMP/mwenv" ls --json)" = "[]"
       # Only where the images were just built: loaded images come without the build cache, so a rebuild would take
