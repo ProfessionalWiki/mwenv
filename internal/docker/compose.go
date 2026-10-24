@@ -58,6 +58,9 @@ func ComposeFile(env environment.Env, p project.Project, image string, user User
 		// SELinux denies containers the bind mounts. Relabelling them instead would change the labels of the
 		// developer's own files.
 		"security_opt": []string{"label=disable"},
+		// The PHP image stops Apache gracefully, which takes a second longer to finish requests a development wiki
+		// can drop.
+		"stop_signal": "SIGTERM",
 		"environment": map[string]string{
 			"APACHE_RUN_USER":  fmt.Sprintf("#%d", user.UID),
 			"APACHE_RUN_GROUP": fmt.Sprintf("#%d", user.GID),
@@ -77,7 +80,6 @@ func ComposeFile(env environment.Env, p project.Project, image string, user User
 	}
 
 	if mediawiki.Database(env.Database) == mediawiki.MariaDB {
-		web["depends_on"] = map[string]any{"db": map[string]string{"condition": "service_healthy"}}
 		services["db"] = mariaDBService()
 		fileVolumes["db-data"] = map[string]any{}
 	}
@@ -107,12 +109,6 @@ func mariaDBService() map[string]any {
 		},
 		"volumes": []map[string]any{
 			{"type": "volume", "source": "db-data", "target": "/var/lib/mysql"},
-		},
-		"healthcheck": map[string]any{
-			"test":     []string{"CMD", "healthcheck.sh", "--connect", "--innodb_initialized"},
-			"interval": "1s",
-			"timeout":  "5s",
-			"retries":  120,
 		},
 	}
 }
@@ -152,6 +148,16 @@ func volumeExists(name string) bool {
 
 func (c Compose) Start() error {
 	_, err := output(c.args("start")...)
+	return err
+}
+
+// WaitForDatabase polls instead of a Compose healthcheck, which could not poll this often on every engine: Podman
+// ignores start_interval.
+func (c Compose) WaitForDatabase() error {
+	_, err := output(c.args(
+		"exec", "--no-TTY", "db", "timeout", "120", "sh", "-c",
+		"until healthcheck.sh --connect --innodb_initialized; do sleep 0.1; done",
+	)...)
 	return err
 }
 
