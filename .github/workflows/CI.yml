@@ -29,7 +29,7 @@ jobs:
     env:
       # Runs on master, including the weekly one, build the images from scratch, so that upstream changes that break
       # the build show up, and cache them for pull requests and tags.
-      REFRESH_IMAGES: ${{ github.ref == 'refs/heads/master' || github.event_name == 'pull_request' }}
+      REFRESH_IMAGES: ${{ github.ref == 'refs/heads/master' }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
@@ -37,13 +37,6 @@ jobs:
           go-version-file: go.mod
           cache-dependency-path: go.mod
       - run: go build -o "$RUNNER_TEMP/mwenv" ./cmd/mwenv
-      - name: TEMPORARY switch Docker to the classic image store
-        run: |
-          [ -f /etc/docker/daemon.json ] || echo '{}' | sudo tee /etc/docker/daemon.json
-          jq '. + {features: {"containerd-snapshotter": false}}' /etc/docker/daemon.json | sudo tee /etc/docker/daemon.json.new
-          sudo mv /etc/docker/daemon.json.new /etc/docker/daemon.json
-          sudo systemctl restart docker
-          docker info --format 'storage: {{.Driver}} {{.DriverStatus}}'
       - run: echo "IMAGES_CACHE=smoke-images-${{ hashFiles('internal/docker/build/**') }}" >> "$GITHUB_ENV"
       - name: Restore images
         id: restore-images
@@ -80,15 +73,11 @@ jobs:
           "$RUNNER_TEMP/mwenv" start
           old=$(docker image ls --quiet --no-trunc mwenv-core)
           "$RUNNER_TEMP/mwenv" rebuild
-          docker info --format 'storage: {{.Driver}} {{.DriverStatus}}'
-          docker image inspect --format 'after rebuild, old image: {{.Id}} tags={{.RepoTags}}' "$old" || true
-          echo "dangling after rebuild: $(docker image ls --quiet --filter dangling=true --filter label=wiki.professional.mwenv=true)"
           test "$(docker image ls --quiet --no-trunc mwenv-core)" != "$old"
           web=$(docker ps --quiet --filter label=com.docker.compose.service=web)
           test "$(docker inspect --format '{{.Image}}' "$web")" = "$old"
           "$RUNNER_TEMP/mwenv" start
           "$RUNNER_TEMP/mwenv" destroy
-          docker image inspect --format 'after destroy, old image: {{.Id}}' "$old" || echo 'after destroy, old image is gone'
           test -z "$(docker image ls --quiet --filter dangling=true --filter label=wiki.professional.mwenv=true)"
       - name: Save images
         if: env.REFRESH_IMAGES == 'true'
