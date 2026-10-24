@@ -7,6 +7,9 @@ on:
       - master
     tags:
       - 'v*'
+  schedule:
+    - cron: '17 4 * * 1'
+  workflow_dispatch:
 
 jobs:
   test:
@@ -16,18 +19,35 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+          cache-dependency-path: go.mod
       - run: test -z "$(gofmt -l .)"
       - run: go vet ./...
       - run: go test ./...
 
   smoke:
     runs-on: ubuntu-latest
+    env:
+      # Runs on master, including the weekly one, build the images from scratch, so that upstream changes that break
+      # the build show up, and cache them for pull requests and tags.
+      REFRESH_IMAGES: ${{ github.ref == 'refs/heads/master' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+          cache-dependency-path: go.mod
       - run: go build -o "$RUNNER_TEMP/mwenv" ./cmd/mwenv
+      - run: echo "IMAGES_CACHE=smoke-images-${{ hashFiles('internal/docker/build/**') }}" >> "$GITHUB_ENV"
+      - name: Restore images
+        id: restore-images
+        if: env.REFRESH_IMAGES == 'false'
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ runner.temp }}/images.tar
+          key: ${{ env.IMAGES_CACHE }}
+          restore-keys: ${{ env.IMAGES_CACHE }}-
+      - if: steps.restore-images.outputs.cache-matched-key != ''
+        run: docker load --input "$RUNNER_TEMP/images.tar"
       - name: Create an extension
         run: |
           mkdir "$RUNNER_TEMP/SmokeTest"
@@ -44,6 +64,16 @@ jobs:
           "$RUNNER_TEMP/mwenv" run -- php ../../maintenance/run.php showSiteStats
           "$RUNNER_TEMP/mwenv" destroy
           test "$("$RUNNER_TEMP/mwenv" ls --json)" = "[]"
+      - name: Save images
+        if: env.REFRESH_IMAGES == 'true'
+        run: |
+          docker save --output "$RUNNER_TEMP/images.tar" \
+            $(docker image ls --format '{{.Repository}}:{{.Tag}}' | grep -E '^(mwenv-|mariadb:)')
+      - if: env.REFRESH_IMAGES == 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ runner.temp }}/images.tar
+          key: ${{ env.IMAGES_CACHE }}-${{ github.run_id }}
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')
@@ -56,6 +86,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+          cache-dependency-path: go.mod
       - name: Build binaries
         run: |
           # Named after `uname -s` and `uname -m`, which the README's download command uses
