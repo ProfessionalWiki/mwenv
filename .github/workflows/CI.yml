@@ -37,6 +37,13 @@ jobs:
           go-version-file: go.mod
           cache-dependency-path: go.mod
       - run: go build -o "$RUNNER_TEMP/mwenv" ./cmd/mwenv
+      - name: TEMPORARY switch Docker to the classic image store
+        run: |
+          [ -f /etc/docker/daemon.json ] || echo '{}' | sudo tee /etc/docker/daemon.json
+          jq '. + {features: {"containerd-snapshotter": false}}' /etc/docker/daemon.json | sudo tee /etc/docker/daemon.json.new
+          sudo mv /etc/docker/daemon.json.new /etc/docker/daemon.json
+          sudo systemctl restart docker
+          docker info --format 'storage: {{.Driver}} {{.DriverStatus}}'
       - run: echo "IMAGES_CACHE=smoke-images-${{ hashFiles('internal/docker/build/**') }}" >> "$GITHUB_ENV"
       - name: Restore images
         id: restore-images
