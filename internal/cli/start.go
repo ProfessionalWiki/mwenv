@@ -184,7 +184,6 @@ func (a app) create(id string, p project.Project, options startOptions) (environ
 	return env, a.install(&env, p)
 }
 
-// parseImageVersions checks the versions that select the images, which start and rebuild accept alike.
 func parseImageVersions(mediaWiki string, php string) (mediawiki.Version, error) {
 	version, err := mediawiki.ParseVersion(mediaWiki)
 	if err != nil {
