@@ -286,9 +286,6 @@ func (a app) install(env *environment.Env, p project.Project) error {
 	if err := compose.Up(); err != nil {
 		return fmt.Errorf("starting the containers failed: %w", err)
 	}
-	if err := a.waitForDatabase(*env); err != nil {
-		return err
-	}
 
 	commit, err := compose.Exec("", "git", "rev-parse", "HEAD")
 	if err != nil {
@@ -302,6 +299,11 @@ func (a app) install(env *environment.Env, p project.Project) error {
 	}
 	if _, err := compose.Exec("", "composer", "update", "--no-interaction", "--no-progress"); err != nil {
 		return fmt.Errorf("composer update failed: %w", err)
+	}
+
+	// Only now, so that MariaDB initialises while Composer runs.
+	if err := a.waitForDatabase(*env); err != nil {
+		return err
 	}
 
 	a.progress("installing MediaWiki")
