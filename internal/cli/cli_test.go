@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -114,6 +115,34 @@ func TestRunUsesWorktreeRootFromOutsideWorktree(t *testing.T) {
 
 	assertNoError(t, err)
 	assertSame(t, "/var/www/html/w/extensions/PageApprovals", workdir)
+}
+
+func TestRunWithRootRunsTheCommandAsRoot(t *testing.T) {
+	options, err := parseRunOptions([]string{"--root", "--", "install-php-extensions", "pcov"})
+
+	assertNoError(t, err)
+	assertSame(t, true, options.root)
+	assertCommand(t, []string{"install-php-extensions", "pcov"}, options.command)
+}
+
+func TestRunWithoutRootRunsTheCommandAsTheUser(t *testing.T) {
+	options, err := parseRunOptions([]string{"composer", "test"})
+
+	assertNoError(t, err)
+	assertSame(t, false, options.root)
+}
+
+func TestRunPassesArgumentsAfterTheCommandToIt(t *testing.T) {
+	options, err := parseRunOptions([]string{"composer", "phpunit", "--", "--filter", "Root"})
+
+	assertNoError(t, err)
+	assertCommand(t, []string{"composer", "phpunit", "--", "--filter", "Root"}, options.command)
+}
+
+func TestRunWithoutCommandFails(t *testing.T) {
+	_, err := parseRunOptions([]string{"--root", "--"})
+
+	assertErrorContains(t, err, "no command given")
 }
 
 func TestEnvironmentWithMissingWorktreeIsOrphaned(t *testing.T) {
@@ -272,6 +301,13 @@ func assertContains(t *testing.T, haystack string, needle string) {
 	t.Helper()
 	if !strings.Contains(haystack, needle) {
 		t.Errorf("expected to find %q in %q", needle, haystack)
+	}
+}
+
+func assertCommand(t *testing.T, expected []string, actual []string) {
+	t.Helper()
+	if !slices.Equal(expected, actual) {
+		t.Errorf("expected %q, got %q", expected, actual)
 	}
 }
 

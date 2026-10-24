@@ -64,6 +64,19 @@ mwenv start
 `start` runs `update.php` every time. If your extension requires another one, the first `start` fails with MediaWiki's
 error. Install the missing extension this way, then run `start` again.
 
+## Add PHP extensions
+
+To use a PHP extension the image lacks, install it as root. `mwenv run` sees it at once; the wiki loads it after you
+restart the environment:
+
+```sh
+mwenv run --root -- install-php-extensions xdebug
+mwenv stop && mwenv start
+```
+
+It stays until you destroy the environment. Use `--root` only for changes to the container: on Linux, files it
+creates in your worktree do not belong to you.
+
 ## Develop mwenv
 
 You need Go 1.21 or later, which downloads the Go version mwenv needs. Run the tests with `go test ./...`.

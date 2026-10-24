@@ -17,7 +17,7 @@ const usage = `mwenv starts a disposable MediaWiki for the extension or skin in 
 
 Usage:
   mwenv start [--mw <version>] [--php <version>] [--db mariadb|sqlite] [--json]
-  mwenv run [--] <command> [<args>...]
+  mwenv run [--root] [--] <command> [<args>...]
   mwenv status [--json]
   mwenv ls [--json]
   mwenv stop
@@ -34,6 +34,7 @@ start creates the environment if needed, starts it, runs update.php and waits fo
 
 run executes a command in the web container, in the directory matching the current one.
 MediaWiki is installed at /var/www/html/w; install and configure other extensions through run.
+  --root  Run as root, to change the container, such as installing a PHP extension.
 
 rebuild builds the images for --mw and --php (same values and defaults as start) again, from the newest commits of
 the MediaWiki branch and the newest PHP base image. Existing environments keep their images; destroy and start one
