@@ -4,29 +4,24 @@ mwenv starts a disposable MediaWiki for the extension or skin in the current git
 containers, database and port, so you can run several at once, for example one per coding agent. The worktree is the
 live code: edits show on the next reload.
 
-You need Docker or Podman, and git.
+mwenv runs on Linux and macOS. You need git, and Docker with Compose or Podman with its `docker` command.
 
 ## Install
 
-With Go 1.21 or later:
-
-```sh
-go install github.com/ProfessionalWiki/mwenv/cmd/mwenv@latest
-```
-
-This puts `mwenv` in `$(go env GOPATH)/bin`, usually `~/go/bin`; make sure that directory is on your `PATH`.
-
-Without Go, download the binary for your platform from the latest release into a directory on your `PATH`:
+Download the binary from the latest release into `~/.local/bin`, or another directory on your `PATH`:
 
 ```sh
 curl -fsSL --create-dirs -o ~/.local/bin/mwenv "https://github.com/ProfessionalWiki/mwenv/releases/latest/download/mwenv-$(uname -s)-$(uname -m)"
 chmod +x ~/.local/bin/mwenv
 ```
 
-Releases have binaries for macOS and Linux, on amd64 and arm64. On macOS, download with curl, not a browser: macOS
-blocks unsigned binaries that a browser downloaded.
+Or, with Go 1.21 or later, install it into `$(go env GOPATH)/bin`, which must be on your `PATH`:
 
-To upgrade, run the install command again. `mwenv version` prints the version you have.
+```sh
+go install github.com/ProfessionalWiki/mwenv/cmd/mwenv@latest
+```
+
+To upgrade, run the install command again.
 
 ## Use
 
@@ -40,14 +35,14 @@ mwenv status --json
 mwenv destroy
 ```
 
-`start` prints the wiki's URL and the admin login. The first `start` for a MediaWiki and PHP version builds images,
-which takes a few minutes. After that, a new environment is ready in well under a minute. `mwenv help` lists all
-commands.
+`start` prints the wiki's URL and the admin login. Creating an environment installs your extension's Composer
+dependencies. The first `start` for a MediaWiki and PHP version also builds images, which takes a few minutes; later
+environments are ready in under a minute. `mwenv help` lists all commands and flags.
 
-A branch such as `1.45` or `master` stays at the commit it had when its image was built. Run `mwenv rebuild` with the
-`--mw` and `--php` you pass to `start` to rebuild the images from the branch's newest commits and the newest PHP base
-image. New environments use them. An existing environment keeps its image until you destroy it and start it again,
-which discards its database and your changes in the container.
+Images built from a branch, such as `--mw 1.45` (`REL1_45`) or `master`, keep the commit the branch had when they were
+built. Run `mwenv rebuild` with the `--mw` and `--php` you pass to `start` to rebuild the images from the branch's
+newest commits and the newest PHP base image. New environments use them. An existing environment keeps its image until
+you destroy it and start it again, which discards its database and your changes in the container.
 
 ## Add other extensions
 
@@ -60,12 +55,12 @@ mwenv run -- sh -c 'echo "wfLoadExtension( \"AdminLinks\" );" >> /var/www/html/w
 mwenv start
 ```
 
-`start` runs `update.php` and waits for the Main Page every time. If your extension requires another one, the first
-`start` fails with MediaWiki's error. Install the missing extension this way, then run `start` again.
+`start` runs `update.php` every time. If your extension requires another one, the first `start` fails with MediaWiki's
+error. Install the missing extension this way, then run `start` again.
 
 ## Develop mwenv
 
 You need Go 1.21 or later, which downloads the Go version mwenv needs. Run the tests with `go test ./...`.
 
-Pushing a tag such as `v1.0.0` makes CI attach the binaries to a new release. Never move or reuse a tag: `go install`
-fetches through Go's module proxy, which keeps serving the commit it first saw for each tag.
+Pushing a tag such as `v1.0.0` makes CI attach the binaries to a new release. Never move or reuse a tag: Go's module
+proxy keeps serving the commit it first saw for each tag.
