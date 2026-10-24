@@ -65,9 +65,7 @@ func TestStartRefusesUnfinishedCreation(t *testing.T) {
 
 	err := a.resume(env(false), startOptions{passed: map[string]bool{}})
 
-	if err == nil || !strings.Contains(err.Error(), "mwenv destroy") {
-		t.Errorf("expected an error telling to run mwenv destroy, got %v", err)
-	}
+	assertErrorContains(t, err, "mwenv destroy")
 }
 
 func TestPickPortSkipsPortsOfStoredEnvironments(t *testing.T) {
@@ -168,6 +166,30 @@ func TestDestroyFailsWhileStartIsPreparing(t *testing.T) {
 	}
 }
 
+func TestRebuildRejectsUnsupportedMediaWikiVersion(t *testing.T) {
+	hideDocker(t)
+
+	err := newApp(t).rebuild([]string{"--mw", "1.39"})
+
+	assertErrorContains(t, err, "1.39")
+}
+
+func TestRebuildRejectsInvalidPHPVersion(t *testing.T) {
+	hideDocker(t)
+
+	err := newApp(t).rebuild([]string{"--php", "eight"})
+
+	assertErrorContains(t, err, "not a PHP version")
+}
+
+func TestRebuildFailsWhenTheBuildFails(t *testing.T) {
+	hideDocker(t)
+
+	if err := newApp(t).rebuild(nil); err == nil {
+		t.Error("expected an error, got nil")
+	}
+}
+
 func TestPortHeldOnIpv6LoopbackIsNotFree(t *testing.T) {
 	listener, err := net.Listen("tcp6", "[::1]:0")
 	if err != nil {
@@ -203,6 +225,12 @@ func TestPassingADifferentValueIsRejected(t *testing.T) {
 	if err := checkUnchangedOptions(env(true), options); err == nil {
 		t.Error("expected an error, got nil")
 	}
+}
+
+// hideDocker makes every docker call fail, so that a test never builds or removes the images the user's
+// environments share.
+func hideDocker(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
 }
 
 func takeLock(t *testing.T, a app, id string) *environment.Lock {
@@ -245,6 +273,14 @@ func assertContains(t *testing.T, haystack string, needle string) {
 	if !strings.Contains(haystack, needle) {
 		t.Errorf("expected to find %q in %q", needle, haystack)
 	}
+}
+
+func assertErrorContains(t *testing.T, err error, needle string) {
+	t.Helper()
+	if err == nil {
+		t.Fatalf("expected an error containing %q, got nil", needle)
+	}
+	assertContains(t, err.Error(), needle)
 }
 
 func assertNoError(t *testing.T, err error) {

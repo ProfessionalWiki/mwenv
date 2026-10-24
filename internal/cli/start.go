@@ -18,8 +18,10 @@ import (
 )
 
 const (
-	mainPageTimeout = 60 * time.Second
-	retryAdvice     = "fix the cause through mwenv run, then run mwenv start again"
+	defaultMediaWiki = "1.43"
+	defaultPHP       = "8.3"
+	mainPageTimeout  = 60 * time.Second
+	retryAdvice      = "fix the cause through mwenv run, then run mwenv start again"
 )
 
 type startOptions struct {
@@ -88,8 +90,8 @@ func parseStartOptions(args []string) (startOptions, error) {
 	options := startOptions{passed: map[string]bool{}}
 
 	flags := newFlagSet("start")
-	flags.StringVar(&options.mediaWiki, "mw", "1.43", "")
-	flags.StringVar(&options.php, "php", "8.3", "")
+	flags.StringVar(&options.mediaWiki, "mw", defaultMediaWiki, "")
+	flags.StringVar(&options.php, "php", defaultPHP, "")
 	flags.StringVar(&options.database, "db", string(mediawiki.MariaDB), "")
 	flags.BoolVar(&options.json, "json", false, "")
 
@@ -151,15 +153,12 @@ func checkUnchangedOptions(env environment.Env, options startOptions) error {
 }
 
 func (a app) create(id string, p project.Project, options startOptions) (environment.Env, error) {
-	version, err := mediawiki.ParseVersion(options.mediaWiki)
+	version, err := parseImageVersions(options.mediaWiki, options.php)
 	if err != nil {
 		return environment.Env{}, err
 	}
 	database, err := mediawiki.ParseDatabase(options.database)
 	if err != nil {
-		return environment.Env{}, err
-	}
-	if err := docker.ValidatePHPVersion(options.php); err != nil {
 		return environment.Env{}, err
 	}
 
@@ -183,6 +182,14 @@ func (a app) create(id string, p project.Project, options startOptions) (environ
 	}
 
 	return env, a.install(&env, p)
+}
+
+func parseImageVersions(mediaWiki string, php string) (mediawiki.Version, error) {
+	version, err := mediawiki.ParseVersion(mediaWiki)
+	if err != nil {
+		return mediawiki.Version{}, err
+	}
+	return version, docker.ValidatePHPVersion(php)
 }
 
 func (a app) record(env *environment.Env, p project.Project, image string) error {

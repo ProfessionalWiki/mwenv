@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"sync"
 
 	"github.com/ProfessionalWiki/mwenv/internal/mediawiki"
@@ -18,6 +19,9 @@ import (
 var buildFiles embed.FS
 
 var phpVersionPattern = regexp.MustCompile(`^[0-9]+(\.[0-9]+){1,2}([.-][A-Za-z0-9]+)*$`)
+
+// imageLabel marks the images mwenv builds, so that PruneImages finds the ones a rebuild replaced.
+const imageLabel = "wiki.professional.mwenv=true"
 
 func ValidatePHPVersion(version string) error {
 	if !phpVersionPattern.MatchString(version) {
@@ -63,18 +67,44 @@ func EnsureImages(version mediawiki.Version, php string, onBuild func(image stri
 
 	base := PHPImage(php)
 	if !imageExists(base) {
-		onBuild(base)
-		if err := build(base, "php.Dockerfile", "PHP_VERSION="+php); err != nil {
-			return fmt.Errorf("building %s failed: %w", base, err)
+		if err := buildPHPImage(php, onBuild); err != nil {
+			return err
 		}
 	}
 
-	onBuild(core)
-	err := build(core, "core.Dockerfile", "BASE_IMAGE="+base, "CORE_REF="+version.CoreRef, "VECTOR_REF="+version.VectorRef)
-	if err != nil {
-		return fmt.Errorf("building %s failed: %w", core, err)
+	return buildCoreImage(version, php, onBuild)
+}
+
+// RebuildImages builds the images for a MediaWiki and PHP version again, with the newest commits of the MediaWiki
+// branch and the newest PHP base image.
+func RebuildImages(version mediawiki.Version, php string, onBuild func(image string)) error {
+	if err := buildPHPImage(php, onBuild, "--pull"); err != nil {
+		return err
 	}
-	return nil
+
+	// Without --no-cache, the build would reuse the clone of the branch from the previous build.
+	return buildCoreImage(version, php, onBuild, "--no-cache")
+}
+
+func buildPHPImage(php string, onBuild func(image string), flags ...string) error {
+	return build(PHPImage(php), "php.Dockerfile", []string{"PHP_VERSION=" + php}, onBuild, flags...)
+}
+
+func buildCoreImage(version mediawiki.Version, php string, onBuild func(image string), flags ...string) error {
+	buildArgs := []string{"BASE_IMAGE=" + PHPImage(php), "CORE_REF=" + version.CoreRef, "VECTOR_REF=" + version.VectorRef}
+	return build(CoreImage(version, php), "core.Dockerfile", buildArgs, onBuild, flags...)
+}
+
+// PruneImages removes the images mwenv built that lost their tag to a rebuild and that no container uses. Docker's
+// classic image store keeps such images; its containerd image store removes them when the tag moves.
+func PruneImages() error {
+	_, err := output("image", "prune", "--force", "--filter", "label="+imageLabel)
+	// Docker runs one prune at a time, which parallel destroys in several worktrees run into. The prune that runs
+	// does this one's work, and whatever it misses the next prune removes.
+	if err != nil && strings.Contains(err.Error(), "a prune operation is already running") {
+		return nil
+	}
+	return err
 }
 
 func imageExists(tag string) bool {
@@ -82,20 +112,28 @@ func imageExists(tag string) bool {
 	return err == nil
 }
 
-func build(tag string, dockerfile string, buildArgs ...string) error {
+func build(image string, dockerfile string, buildArgs []string, onBuild func(image string), flags ...string) error {
+	onBuild(image)
+
 	context, err := writeBuildContext()
 	if err != nil {
 		return err
 	}
 	defer os.RemoveAll(context)
 
-	args := []string{"build", "--progress=plain", "--tag", tag, "--file", filepath.Join(context, dockerfile)}
+	args := []string{
+		"build", "--progress=plain", "--label", imageLabel,
+		"--tag", image, "--file", filepath.Join(context, dockerfile),
+	}
 	for _, buildArg := range buildArgs {
 		args = append(args, "--build-arg", buildArg)
 	}
+	args = append(args, flags...)
 
-	_, err = output(append(args, context)...)
-	return err
+	if _, err := output(append(args, context)...); err != nil {
+		return fmt.Errorf("building %s failed: %w", image, err)
+	}
+	return nil
 }
 
 func writeBuildContext() (string, error) {

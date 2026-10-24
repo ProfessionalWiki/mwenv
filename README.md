@@ -44,9 +44,10 @@ mwenv destroy
 which takes a few minutes. After that, a new environment is ready in well under a minute. `mwenv help` lists all
 commands.
 
-Images are reused, so a branch such as `1.45` or `master` stays at the commit it had when its image was built. To get
-newer commits, remove the image (`docker image ls mwenv-core`, then `docker image rm`); environments created after
-that use a fresh one.
+A branch such as `1.45` or `master` stays at the commit it had when its image was built. Run `mwenv rebuild` with the
+`--mw` and `--php` you pass to `start` to rebuild the images from the branch's newest commits and the newest PHP base
+image. New environments use them. An existing environment keeps its image until you destroy it and start it again,
+which discards its database and your changes in the container.
 
 ## Add other extensions
 
