@@ -7,7 +7,7 @@ RUN apt-get update \
 	&& rm -rf /var/lib/apt/lists/*
 
 COPY --from=docker.io/mlocati/php-extension-installer:2 /usr/bin/install-php-extensions /usr/local/bin/
-RUN install-php-extensions apcu calendar gd intl mysqli opcache zip
+RUN install-php-extensions apcu ast calendar gd intl mysqli opcache zip
 
 COPY --from=docker.io/library/composer:2 /usr/bin/composer /usr/local/bin/composer
 
