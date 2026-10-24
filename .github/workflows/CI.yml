@@ -29,7 +29,7 @@ jobs:
     env:
       # Runs on master, including the weekly one, build the images from scratch, so that upstream changes that break
       # the build show up, and cache them for pull requests and tags.
-      REFRESH_IMAGES: ${{ github.ref == 'refs/heads/master' }}
+      REFRESH_IMAGES: ${{ github.ref == 'refs/heads/master' || github.event_name == 'pull_request' }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
@@ -73,11 +73,14 @@ jobs:
           "$RUNNER_TEMP/mwenv" start
           old=$(docker image ls --quiet --no-trunc mwenv-core)
           "$RUNNER_TEMP/mwenv" rebuild
+          docker info --format 'storage: {{.Driver}} {{.DriverStatus}}'
+          docker image ls --all --filter label=wiki.professional.mwenv=true
           test "$(docker image ls --quiet --no-trunc mwenv-core)" != "$old"
           web=$(docker ps --quiet --filter label=com.docker.compose.service=web)
           test "$(docker inspect --format '{{.Image}}' "$web")" = "$old"
           "$RUNNER_TEMP/mwenv" start
           "$RUNNER_TEMP/mwenv" destroy
+          docker image ls --all --filter label=wiki.professional.mwenv=true
           test -z "$(docker image ls --quiet --filter dangling=true --filter label=wiki.professional.mwenv=true)"
       - name: Save images
         if: env.REFRESH_IMAGES == 'true'
