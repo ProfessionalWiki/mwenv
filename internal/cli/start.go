@@ -21,6 +21,7 @@ const (
 	defaultMediaWiki = "1.43"
 	defaultPHP       = "8.3"
 	mainPageTimeout  = 60 * time.Second
+	portReleaseTime  = 2 * time.Second
 	retryAdvice      = "fix the cause through mwenv run, then run mwenv start again"
 )
 
@@ -121,7 +122,7 @@ func (a app) resume(env environment.Env, options startOptions) error {
 	case stateBroken:
 		return errBroken(env.ID)
 	case stateStopped:
-		if !portIsFree(env.Port) {
+		if !portIsFreeWithin(env.Port, portReleaseTime) {
 			return fmt.Errorf("port %d of the environment %s is in use by another process", env.Port, env.ID)
 		}
 		a.progress("starting containers")
@@ -229,6 +230,19 @@ func (a app) pickPort(worktree string) (int, error) {
 	}
 
 	return environment.PickPort(environment.StartPort(worktree), taken, portIsFree)
+}
+
+// portIsFreeWithin waits for the port of containers that just stopped: OrbStack, for one, releases it only after docker
+// compose stop returns.
+func portIsFreeWithin(port int, timeout time.Duration) bool {
+	deadline := time.Now().Add(timeout)
+	for !portIsFree(port) {
+		if time.Now().After(deadline) {
+			return false
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	return true
 }
 
 // portIsFree also tries to connect, because on macOS binding 127.0.0.1 succeeds while another process listens on all
