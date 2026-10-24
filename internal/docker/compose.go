@@ -58,6 +58,9 @@ func ComposeFile(env environment.Env, p project.Project, image string, user User
 		// SELinux denies containers the bind mounts. Relabelling them instead would change the labels of the
 		// developer's own files.
 		"security_opt": []string{"label=disable"},
+		// The PHP image stops Apache gracefully, which takes a second longer to finish requests a development wiki
+		// can drop.
+		"stop_signal": "SIGTERM",
 		"environment": map[string]string{
 			"APACHE_RUN_USER":  fmt.Sprintf("#%d", user.UID),
 			"APACHE_RUN_GROUP": fmt.Sprintf("#%d", user.GID),

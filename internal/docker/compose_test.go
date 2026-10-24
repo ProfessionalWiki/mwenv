@@ -13,6 +13,7 @@ import (
 type composeFile struct {
 	Services map[string]struct {
 		DependsOn   map[string]any    `json:"depends_on"`
+		StopSignal  string            `json:"stop_signal"`
 		Healthcheck map[string]any    `json:"healthcheck"`
 		Environment map[string]string `json:"environment"`
 		Ports       []string          `json:"ports"`
@@ -94,6 +95,12 @@ func TestWebContainerDisablesSELinuxLabels(t *testing.T) {
 	if !slices.Contains(file.Services["web"].SecurityOpt, "label=disable") {
 		t.Errorf("expected label=disable, got %v", file.Services["web"].SecurityOpt)
 	}
+}
+
+func TestApacheStopsWithoutWaitingForRequests(t *testing.T) {
+	file := compose(t, newEnv("mariadb"), pageApprovals(""))
+
+	assertSame(t, "SIGTERM", file.Services["web"].StopSignal)
 }
 
 func TestPodmanMapsHostUserToItself(t *testing.T) {
