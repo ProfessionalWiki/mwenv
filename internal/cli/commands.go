@@ -8,7 +8,6 @@ import (
 
 	"github.com/ProfessionalWiki/mwenv/internal/docker"
 	"github.com/ProfessionalWiki/mwenv/internal/environment"
-	"github.com/ProfessionalWiki/mwenv/internal/mediawiki"
 	"github.com/ProfessionalWiki/mwenv/internal/project"
 )
 
@@ -270,19 +269,17 @@ func (a app) rebuild(args []string) error {
 		return err
 	}
 
-	version, err := mediawiki.ParseVersion(*mediaWiki)
+	version, err := parseImageVersions(*mediaWiki, *php)
 	if err != nil {
-		return err
-	}
-	if err := docker.ValidatePHPVersion(*php); err != nil {
 		return err
 	}
 
 	onBuild := func(image string) { a.progress("rebuilding %s", image) }
-	if err := docker.RebuildImages(version, *php, onBuild); err != nil {
+	err = docker.RebuildImages(version, *php, onBuild)
+	a.pruneImages()
+	if err != nil {
 		return err
 	}
-	a.pruneImages()
 
 	fmt.Fprintf(a.stdout, "Rebuilt the images for MediaWiki %s and PHP %s\n", version.Requested, *php)
 	return nil

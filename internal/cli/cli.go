@@ -35,7 +35,7 @@ start creates the environment if needed, starts it, runs update.php and waits fo
 run executes a command in the web container, in the directory matching the current one.
 MediaWiki is installed at /var/www/html/w; install and configure other extensions through run.
 
-rebuild builds the images for --mw and --php again (same values and defaults as start), from the newest commits of
+rebuild builds the images for --mw and --php (same values and defaults as start) again, from the newest commits of
 the MediaWiki branch and the newest PHP base image. Existing environments keep their images; destroy and start one
 again to use the new ones.
 `

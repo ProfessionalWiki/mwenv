@@ -153,15 +153,12 @@ func checkUnchangedOptions(env environment.Env, options startOptions) error {
 }
 
 func (a app) create(id string, p project.Project, options startOptions) (environment.Env, error) {
-	version, err := mediawiki.ParseVersion(options.mediaWiki)
+	version, err := parseImageVersions(options.mediaWiki, options.php)
 	if err != nil {
 		return environment.Env{}, err
 	}
 	database, err := mediawiki.ParseDatabase(options.database)
 	if err != nil {
-		return environment.Env{}, err
-	}
-	if err := docker.ValidatePHPVersion(options.php); err != nil {
 		return environment.Env{}, err
 	}
 
@@ -185,6 +182,15 @@ func (a app) create(id string, p project.Project, options startOptions) (environ
 	}
 
 	return env, a.install(&env, p)
+}
+
+// parseImageVersions checks the versions that select the images, which start and rebuild accept alike.
+func parseImageVersions(mediaWiki string, php string) (mediawiki.Version, error) {
+	version, err := mediawiki.ParseVersion(mediaWiki)
+	if err != nil {
+		return mediawiki.Version{}, err
+	}
+	return version, docker.ValidatePHPVersion(php)
 }
 
 func (a app) record(env *environment.Env, p project.Project, image string) error {
