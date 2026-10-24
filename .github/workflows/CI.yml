@@ -90,8 +90,7 @@ jobs:
           path: ${{ runner.temp }}/images.tar
           key: ${{ env.IMAGES_CACHE }}-${{ github.run_id }}
 
-  release:
-    if: startsWith(github.ref, 'refs/tags/v')
+  package:
     needs: [test, smoke]
     runs-on: ubuntu-latest
     permissions:
@@ -102,17 +101,30 @@ jobs:
         with:
           go-version-file: go.mod
           cache-dependency-path: go.mod
-      - name: Build binaries
+      - name: Build the release archives
         run: |
-          # Named after `uname -s` and `uname -m`, which the README's download command uses
-          build() {
-            GOOS=$1 GOARCH=$2 CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o "dist/mwenv-$3" ./cmd/mwenv
+          # Named after `uname -s` and `uname -m`, which the README's download command uses. Built outside the
+          # checkout, since Go marks a binary built in a checkout with untracked files as +dirty.
+          archive() {
+            dir="$RUNNER_TEMP/build/$3"
+            mkdir -p "$dir" "$RUNNER_TEMP/dist"
+            GOOS=$1 GOARCH=$2 CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o "$dir/mwenv" ./cmd/mwenv
+            cp LICENSE README.md "$dir"
+            tar -czf "$RUNNER_TEMP/dist/mwenv-$3.tar.gz" -C "$dir" mwenv LICENSE README.md
           }
-          build darwin amd64 Darwin-x86_64
-          build darwin arm64 Darwin-arm64
-          build linux amd64 Linux-x86_64
-          build linux arm64 Linux-aarch64
+          archive darwin amd64 Darwin-x86_64
+          archive darwin arm64 Darwin-arm64
+          archive linux amd64 Linux-x86_64
+          archive linux arm64 Linux-aarch64
+      - name: Check the Linux x86_64 archive
+        run: |
+          tar -xzf "$RUNNER_TEMP/dist/mwenv-Linux-x86_64.tar.gz" -C "$RUNNER_TEMP" mwenv
+          version=$("$RUNNER_TEMP/mwenv" version)
+          echo "$version"
+          # A release must report exactly its tag, without +dirty.
+          if [[ $GITHUB_REF == refs/tags/* ]]; then test "$version" = "$GITHUB_REF_NAME"; fi
       - name: Create release
-        run: gh release create "$GITHUB_REF_NAME" dist/* --generate-notes
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: gh release create "$GITHUB_REF_NAME" "$RUNNER_TEMP"/dist/* --generate-notes
         env:
           GH_TOKEN: ${{ github.token }}
