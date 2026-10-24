@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/ProfessionalWiki/mwenv/internal/environment"
 	"github.com/ProfessionalWiki/mwenv/internal/project"
@@ -229,6 +230,20 @@ func TestPortHeldOnIpv6LoopbackIsNotFree(t *testing.T) {
 	assertSame(t, false, portIsFree(listener.Addr().(*net.TCPAddr).Port))
 }
 
+func TestPortReleasedWithinTimeoutIsFree(t *testing.T) {
+	listener := listenOnLoopback(t)
+	time.AfterFunc(100*time.Millisecond, func() { _ = listener.Close() })
+
+	assertSame(t, true, portIsFreeWithin(listener.Addr().(*net.TCPAddr).Port, 2*time.Second))
+}
+
+func TestPortHeldPastTimeoutIsNotFree(t *testing.T) {
+	listener := listenOnLoopback(t)
+	defer listener.Close()
+
+	assertSame(t, false, portIsFreeWithin(listener.Addr().(*net.TCPAddr).Port, 100*time.Millisecond))
+}
+
 func TestOmittedStartFlagsKeepExistingValues(t *testing.T) {
 	options, err := parseStartOptions([]string{})
 	assertNoError(t, err)
@@ -260,6 +275,13 @@ func TestPassingADifferentValueIsRejected(t *testing.T) {
 // environments share.
 func hideDocker(t *testing.T) {
 	t.Setenv("PATH", t.TempDir())
+}
+
+func listenOnLoopback(t *testing.T) net.Listener {
+	t.Helper()
+	listener, err := net.Listen("tcp4", "127.0.0.1:0")
+	assertNoError(t, err)
+	return listener
 }
 
 func takeLock(t *testing.T, a app, id string) *environment.Lock {
