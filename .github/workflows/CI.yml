@@ -27,9 +27,9 @@ jobs:
   smoke:
     runs-on: ubuntu-latest
     env:
-      # Runs on master, including the weekly one, build the images from scratch, so that upstream changes that break
-      # the build show up, and cache them for pull requests and tags.
-      REFRESH_IMAGES: ${{ github.ref == 'refs/heads/master' }}
+      # The weekly and manual runs build the images from scratch, so that upstream changes that break the build show
+      # up. Other runs reuse the cached images.
+      REFRESH_IMAGES: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
@@ -81,12 +81,13 @@ jobs:
           "$RUNNER_TEMP/mwenv" start
           "$RUNNER_TEMP/mwenv" destroy
           test -z "$(docker image ls --quiet --filter dangling=true --filter label=wiki.professional.mwenv=true)"
+      # Whenever the images were built, but only on master: pull requests and tags can restore master's cache only.
       - name: Save images
-        if: env.REFRESH_IMAGES == 'true'
+        if: github.ref == 'refs/heads/master' && steps.restore-images.outputs.cache-matched-key == ''
         run: |
           docker save --output "$RUNNER_TEMP/images.tar" \
             $(docker image ls --format '{{.Repository}}:{{.Tag}}' | grep -E '^(mwenv-|mariadb:)')
-      - if: env.REFRESH_IMAGES == 'true'
+      - if: github.ref == 'refs/heads/master' && steps.restore-images.outputs.cache-matched-key == ''
         uses: actions/cache/save@v6
         with:
           path: ${{ runner.temp }}/images.tar
