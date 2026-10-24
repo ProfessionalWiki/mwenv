@@ -58,10 +58,14 @@ jobs:
           go-version-file: go.mod
       - name: Build binaries
         run: |
-          for target in darwin/amd64 darwin/arm64 linux/amd64 linux/arm64; do
-            GOOS=${target%/*} GOARCH=${target#*/} CGO_ENABLED=0 \
-              go build -trimpath -ldflags='-s -w' -o "dist/mwenv-${target%/*}-${target#*/}" ./cmd/mwenv
-          done
+          # Named after `uname -s` and `uname -m`, which the README's download command uses
+          build() {
+            GOOS=$1 GOARCH=$2 CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o "dist/mwenv-$3" ./cmd/mwenv
+          }
+          build darwin amd64 Darwin-x86_64
+          build darwin arm64 Darwin-arm64
+          build linux amd64 Linux-x86_64
+          build linux arm64 Linux-aarch64
       - name: Create release
         run: gh release create "$GITHUB_REF_NAME" dist/* --generate-notes
         env:

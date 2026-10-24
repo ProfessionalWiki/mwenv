@@ -8,15 +8,25 @@ You need Docker or Podman, and git.
 
 ## Install
 
-Download the binary for your platform from the latest release and put it on your `PATH`:
+With Go 1.21 or later:
 
 ```sh
-gh release download --repo ProfessionalWiki/mwenv --pattern mwenv-darwin-arm64 --output ~/.local/bin/mwenv
+go install github.com/ProfessionalWiki/mwenv/cmd/mwenv@latest
+```
+
+This puts `mwenv` in `$(go env GOPATH)/bin`, usually `~/go/bin`; make sure that directory is on your `PATH`.
+
+Without Go, download the binary for your platform from the latest release into a directory on your `PATH`:
+
+```sh
+curl -fsSL --create-dirs -o ~/.local/bin/mwenv "https://github.com/ProfessionalWiki/mwenv/releases/latest/download/mwenv-$(uname -s)-$(uname -m)"
 chmod +x ~/.local/bin/mwenv
 ```
 
-The other binaries are `mwenv-darwin-amd64`, `mwenv-linux-amd64` and `mwenv-linux-arm64`. To build from source
-instead, run `go build -o bin/mwenv ./cmd/mwenv`.
+Releases have binaries for macOS and Linux, on amd64 and arm64. On macOS, download with curl, not a browser: macOS
+blocks unsigned binaries that a browser downloaded.
+
+To upgrade, run the install command again. `mwenv version` prints the version you have.
 
 ## Use
 
@@ -56,4 +66,5 @@ mwenv start
 
 You need Go 1.21 or later, which downloads the Go version mwenv needs. Run the tests with `go test ./...`.
 
-Pushing a tag such as `v1.0.0` makes CI attach the binaries to a new release.
+Pushing a tag such as `v1.0.0` makes CI attach the binaries to a new release. Never move or reuse a tag: `go install`
+fetches through Go's module proxy, which keeps serving the commit it first saw for each tag.

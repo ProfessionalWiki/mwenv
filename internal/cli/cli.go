@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 
 	"github.com/ProfessionalWiki/mwenv/internal/docker"
 	"github.com/ProfessionalWiki/mwenv/internal/environment"
@@ -22,6 +23,7 @@ Usage:
   mwenv stop
   mwenv logs [--follow]
   mwenv destroy [<id>...]
+  mwenv version
 
 start creates the environment if needed, starts it, runs update.php and waits for the Main Page.
   --mw   1.45 (REL1_45 branch), 1.45.2 (release tag), master, or another branch or tag. Default: 1.43
@@ -96,9 +98,20 @@ func (a app) dispatch(args []string) (int, error) {
 	case "help", "-h", "--help":
 		fmt.Fprint(a.stdout, usage)
 		return 0, nil
+	case "version", "--version":
+		fmt.Fprintln(a.stdout, version())
+		return 0, nil
 	}
 
 	return 2, fmt.Errorf("unknown command %q; run mwenv help", command)
+}
+
+func version() string {
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		return "unknown"
+	}
+	return info.Main.Version
 }
 
 func newFlagSet(name string) *flag.FlagSet {
