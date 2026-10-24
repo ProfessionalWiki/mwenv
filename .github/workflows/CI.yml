@@ -81,13 +81,14 @@ jobs:
           old=$(docker image ls --quiet --no-trunc mwenv-core)
           "$RUNNER_TEMP/mwenv" rebuild
           docker info --format 'storage: {{.Driver}} {{.DriverStatus}}'
-          docker image ls --all --filter label=wiki.professional.mwenv=true
+          docker image inspect --format 'after rebuild, old image: {{.Id}} tags={{.RepoTags}}' "$old" || true
+          echo "dangling after rebuild: $(docker image ls --quiet --filter dangling=true --filter label=wiki.professional.mwenv=true)"
           test "$(docker image ls --quiet --no-trunc mwenv-core)" != "$old"
           web=$(docker ps --quiet --filter label=com.docker.compose.service=web)
           test "$(docker inspect --format '{{.Image}}' "$web")" = "$old"
           "$RUNNER_TEMP/mwenv" start
           "$RUNNER_TEMP/mwenv" destroy
-          docker image ls --all --filter label=wiki.professional.mwenv=true
+          docker image inspect --format 'after destroy, old image: {{.Id}}' "$old" || echo 'after destroy, old image is gone'
           test -z "$(docker image ls --quiet --filter dangling=true --filter label=wiki.professional.mwenv=true)"
       - name: Save images
         if: env.REFRESH_IMAGES == 'true'
