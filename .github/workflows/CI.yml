@@ -64,6 +64,21 @@ jobs:
           "$RUNNER_TEMP/mwenv" run -- php ../../maintenance/run.php showSiteStats
           "$RUNNER_TEMP/mwenv" destroy
           test "$("$RUNNER_TEMP/mwenv" ls --json)" = "[]"
+      # Only where the images were just built: loaded images come without the build cache, so a rebuild would take
+      # minutes.
+      - name: Rebuild the images under an existing environment
+        if: env.REFRESH_IMAGES == 'true'
+        working-directory: ${{ runner.temp }}/SmokeTest
+        run: |
+          "$RUNNER_TEMP/mwenv" start
+          old=$(docker image ls --quiet --no-trunc mwenv-core)
+          "$RUNNER_TEMP/mwenv" rebuild
+          test "$(docker image ls --quiet --no-trunc mwenv-core)" != "$old"
+          web=$(docker ps --quiet --filter label=com.docker.compose.service=web)
+          test "$(docker inspect --format '{{.Image}}' "$web")" = "$old"
+          "$RUNNER_TEMP/mwenv" start
+          "$RUNNER_TEMP/mwenv" destroy
+          test -z "$(docker image ls --quiet --filter dangling=true --filter label=wiki.professional.mwenv=true)"
       - name: Save images
         if: env.REFRESH_IMAGES == 'true'
         run: |

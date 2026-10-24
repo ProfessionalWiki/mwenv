@@ -8,6 +8,7 @@ import (
 
 	"github.com/ProfessionalWiki/mwenv/internal/docker"
 	"github.com/ProfessionalWiki/mwenv/internal/environment"
+	"github.com/ProfessionalWiki/mwenv/internal/mediawiki"
 	"github.com/ProfessionalWiki/mwenv/internal/project"
 )
 
@@ -243,6 +244,7 @@ func (a app) removeEnvironment(id string) error {
 		if err := a.compose(id).Down(); err != nil {
 			return err
 		}
+		a.pruneImages()
 	}
 
 	if err := a.store.Remove(id); err != nil {
@@ -250,5 +252,38 @@ func (a app) removeEnvironment(id string) error {
 	}
 
 	fmt.Fprintf(a.stdout, "Destroyed %s\n", id)
+	return nil
+}
+
+// pruneImages does not fail the command: a failure only leaves images behind, which the next prune removes.
+func (a app) pruneImages() {
+	if err := docker.PruneImages(); err != nil {
+		a.progress("removing unused images failed: %v", err)
+	}
+}
+
+func (a app) rebuild(args []string) error {
+	flags := newFlagSet("rebuild")
+	mediaWiki := flags.String("mw", defaultMediaWiki, "")
+	php := flags.String("php", defaultPHP, "")
+	if err := parseFlags(flags, args); err != nil {
+		return err
+	}
+
+	version, err := mediawiki.ParseVersion(*mediaWiki)
+	if err != nil {
+		return err
+	}
+	if err := docker.ValidatePHPVersion(*php); err != nil {
+		return err
+	}
+
+	onBuild := func(image string) { a.progress("rebuilding %s", image) }
+	if err := docker.RebuildImages(version, *php, onBuild); err != nil {
+		return err
+	}
+	a.pruneImages()
+
+	fmt.Fprintf(a.stdout, "Rebuilt the images for MediaWiki %s and PHP %s\n", version.Requested, *php)
 	return nil
 }

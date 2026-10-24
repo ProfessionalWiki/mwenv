@@ -23,6 +23,7 @@ Usage:
   mwenv stop
   mwenv logs [--follow]
   mwenv destroy [<id>...]
+  mwenv rebuild [--mw <version>] [--php <version>]
   mwenv version
 
 start creates the environment if needed, starts it, runs update.php and waits for the Main Page.
@@ -33,6 +34,10 @@ start creates the environment if needed, starts it, runs update.php and waits fo
 
 run executes a command in the web container, in the directory matching the current one.
 MediaWiki is installed at /var/www/html/w; install and configure other extensions through run.
+
+rebuild builds the images for --mw and --php again (same values and defaults as start), from the newest commits of
+the MediaWiki branch and the newest PHP base image. Existing environments keep their images; destroy and start one
+again to use the new ones.
 `
 
 type app struct {
@@ -95,6 +100,8 @@ func (a app) dispatch(args []string) (int, error) {
 		return a.logs(args)
 	case "destroy":
 		return 0, a.destroy(args)
+	case "rebuild":
+		return 0, a.rebuild(args)
 	case "help", "-h", "--help":
 		fmt.Fprint(a.stdout, usage)
 		return 0, nil

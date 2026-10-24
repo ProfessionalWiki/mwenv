@@ -18,8 +18,10 @@ import (
 )
 
 const (
-	mainPageTimeout = 60 * time.Second
-	retryAdvice     = "fix the cause through mwenv run, then run mwenv start again"
+	defaultMediaWiki = "1.43"
+	defaultPHP       = "8.3"
+	mainPageTimeout  = 60 * time.Second
+	retryAdvice      = "fix the cause through mwenv run, then run mwenv start again"
 )
 
 type startOptions struct {
@@ -88,8 +90,8 @@ func parseStartOptions(args []string) (startOptions, error) {
 	options := startOptions{passed: map[string]bool{}}
 
 	flags := newFlagSet("start")
-	flags.StringVar(&options.mediaWiki, "mw", "1.43", "")
-	flags.StringVar(&options.php, "php", "8.3", "")
+	flags.StringVar(&options.mediaWiki, "mw", defaultMediaWiki, "")
+	flags.StringVar(&options.php, "php", defaultPHP, "")
 	flags.StringVar(&options.database, "db", string(mediawiki.MariaDB), "")
 	flags.BoolVar(&options.json, "json", false, "")
 

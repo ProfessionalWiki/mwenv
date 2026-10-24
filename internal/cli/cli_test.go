@@ -168,6 +168,18 @@ func TestDestroyFailsWhileStartIsPreparing(t *testing.T) {
 	}
 }
 
+func TestRebuildRejectsUnsupportedMediaWikiVersion(t *testing.T) {
+	err := newApp(t).rebuild([]string{"--mw", "1.39"})
+
+	assertErrorContains(t, err, "not supported")
+}
+
+func TestRebuildRejectsInvalidPHPVersion(t *testing.T) {
+	err := newApp(t).rebuild([]string{"--php", "eight"})
+
+	assertErrorContains(t, err, "not a PHP version")
+}
+
 func TestPortHeldOnIpv6LoopbackIsNotFree(t *testing.T) {
 	listener, err := net.Listen("tcp6", "[::1]:0")
 	if err != nil {
@@ -245,6 +257,14 @@ func assertContains(t *testing.T, haystack string, needle string) {
 	if !strings.Contains(haystack, needle) {
 		t.Errorf("expected to find %q in %q", needle, haystack)
 	}
+}
+
+func assertErrorContains(t *testing.T, err error, needle string) {
+	t.Helper()
+	if err == nil {
+		t.Fatalf("expected an error containing %q, got nil", needle)
+	}
+	assertContains(t, err.Error(), needle)
 }
 
 func assertNoError(t *testing.T, err error) {
