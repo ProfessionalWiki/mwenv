@@ -11,14 +11,20 @@ mwenv runs on Linux and macOS. You need git, and Docker with Compose or Podman w
 Download the binary from the latest release into `~/.local/bin`, or another directory on your `PATH`:
 
 ```sh
-curl -fsSL --create-dirs -o ~/.local/bin/mwenv "https://github.com/ProfessionalWiki/mwenv/releases/latest/download/mwenv-$(uname -s)-$(uname -m)"
-chmod +x ~/.local/bin/mwenv
+mkdir -p ~/.local/bin
+curl -fsSL "https://github.com/ProfessionalWiki/mwenv/releases/latest/download/mwenv-$(uname -s)-$(uname -m).tar.gz" | tar -xz -C ~/.local/bin mwenv
 ```
 
 Or, with Go 1.21 or later, install it into `$(go env GOPATH)/bin`, which must be on your `PATH`:
 
 ```sh
 go install github.com/ProfessionalWiki/mwenv/cmd/mwenv@latest
+```
+
+Or, with [mise](https://mise.jdx.dev):
+
+```sh
+mise use -g github:ProfessionalWiki/mwenv
 ```
 
 To upgrade, run the install command again.
