@@ -12,6 +12,8 @@ import (
 
 type composeFile struct {
 	Services map[string]struct {
+		DependsOn   map[string]any    `json:"depends_on"`
+		Healthcheck map[string]any    `json:"healthcheck"`
 		Environment map[string]string `json:"environment"`
 		Ports       []string          `json:"ports"`
 		SecurityOpt []string          `json:"security_opt"`
@@ -42,6 +44,17 @@ func TestMariaDbEnvironmentHasDatabaseService(t *testing.T) {
 
 	if _, found := file.Services["db"]; !found {
 		t.Error("expected a db service")
+	}
+}
+
+func TestContainersStartWithoutWaitingForTheDatabase(t *testing.T) {
+	file := compose(t, newEnv("mariadb"), pageApprovals(""))
+
+	if file.Services["web"].DependsOn != nil {
+		t.Errorf("expected the web service to depend on nothing, got %v", file.Services["web"].DependsOn)
+	}
+	if file.Services["db"].Healthcheck != nil {
+		t.Errorf("expected no healthcheck, which compose up waits for, got %v", file.Services["db"].Healthcheck)
 	}
 }
 

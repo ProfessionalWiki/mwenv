@@ -126,9 +126,24 @@ func (a app) resume(env environment.Env, options startOptions) error {
 			return fmt.Errorf("port %d of the environment %s is in use by another process", env.Port, env.ID)
 		}
 		a.progress("starting containers")
-		return a.compose(env.ID).Start()
+		if err := a.compose(env.ID).Start(); err != nil {
+			return err
+		}
+		return a.waitForDatabase(env)
 	}
 
+	return nil
+}
+
+func (a app) waitForDatabase(env environment.Env) error {
+	if mediawiki.Database(env.Database) != mediawiki.MariaDB {
+		return nil
+	}
+
+	a.progress("waiting for the database")
+	if err := a.compose(env.ID).WaitForDatabase(); err != nil {
+		return fmt.Errorf("waiting for the database failed: %w", err)
+	}
 	return nil
 }
 
@@ -270,6 +285,9 @@ func (a app) install(env *environment.Env, p project.Project) error {
 	a.progress("starting containers")
 	if err := compose.Up(); err != nil {
 		return fmt.Errorf("starting the containers failed: %w", err)
+	}
+	if err := a.waitForDatabase(*env); err != nil {
+		return err
 	}
 
 	commit, err := compose.Exec("", "git", "rev-parse", "HEAD")
