@@ -12,11 +12,9 @@ import (
 )
 
 func (a app) run(args []string) (int, error) {
-	if len(args) > 0 && args[0] == "--" {
-		args = args[1:]
-	}
-	if len(args) == 0 {
-		return 2, errors.New("run: no command given")
+	options, err := parseRunOptions(args)
+	if err != nil {
+		return 2, err
 	}
 
 	p, env, err := a.currentEnv()
@@ -37,7 +35,32 @@ func (a app) run(args []string) (int, error) {
 		return 0, err
 	}
 
-	return a.compose(env.ID).ExecAttached(workdir, args...)
+	compose := a.compose(env.ID)
+	if options.root {
+		compose.User = docker.User{UID: 0, GID: 0}
+	}
+	return compose.ExecAttached(workdir, options.command...)
+}
+
+type runOptions struct {
+	root    bool
+	command []string
+}
+
+func parseRunOptions(args []string) (runOptions, error) {
+	var options runOptions
+
+	flags := newFlagSet("run")
+	flags.BoolVar(&options.root, "root", false, "")
+	if err := flags.Parse(args); err != nil {
+		return options, fmt.Errorf("run: %w", err)
+	}
+
+	options.command = flags.Args()
+	if len(options.command) == 0 {
+		return options, errors.New("run: no command given")
+	}
+	return options, nil
 }
 
 func (a app) currentEnv() (project.Project, environment.Env, error) {
