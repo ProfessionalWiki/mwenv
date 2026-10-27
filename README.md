@@ -1,12 +1,19 @@
 # mwenv
 
-mwenv starts a disposable MediaWiki for the extension or skin in the current git worktree. Each worktree gets its own
-containers, database and port, so you can run several at once, for example one per coding agent. The worktree is the
-live code: edits show on the next reload.
+mwenv is a CLI that starts a disposable MediaWiki for extension and skin development. Run it in your extension's or
+skin's repository; you don't need a MediaWiki installation of your own.
 
-mwenv runs on Linux and macOS. You need git, and Docker with Compose or Podman with its `docker` command.
+## Features
+
+- You can run several wikis at once, one per git worktree, each with its own database and port.
+- The wiki runs your code in place: edits show on the next reload.
+- Creating an environment installs your extension's or skin's Composer dependencies.
+- You choose the MediaWiki version (`master` included), the PHP version, and MariaDB or SQLite.
+- Coding agents can use it unattended: no command asks for input.
 
 ## Install
+
+mwenv runs on Linux and macOS. You need git, and Docker with Compose or Podman with its `docker` command.
 
 Download the binary from the latest release into `~/.local/bin`, or another directory on your `PATH`:
 
@@ -31,24 +38,19 @@ To upgrade, run the install command again.
 
 ## Use
 
-Run mwenv anywhere in an extension or skin repository, or in a worktree of one:
+Run these anywhere in the repository, or in a worktree of it:
 
 ```sh
-mwenv start                       # MediaWiki 1.43, PHP 8.3, MariaDB
-mwenv start --mw 1.45 --php 8.4   # flags apply when the environment is created
-mwenv run -- composer phpunit     # runs in the container, in the matching directory
-mwenv status --json
+mwenv start                     # MediaWiki 1.43, PHP 8.3, MariaDB
+mwenv run -- composer phpunit   # runs in the container, in the matching directory
+mwenv status
 mwenv destroy
 ```
 
-`start` prints the wiki's URL and the admin login. Creating an environment installs your extension's Composer
-dependencies. The first `start` for a MediaWiki and PHP version also builds images, which takes a few minutes; later
-environments are ready in under a minute. `mwenv help` lists all commands and flags.
-
-Images built from a branch, such as `--mw 1.45` (`REL1_45`) or `master`, keep the commit the branch had when they were
-built. Run `mwenv rebuild` with the `--mw` and `--php` you pass to `start` to rebuild the images from the branch's
-newest commits and the newest PHP base image. New environments use them. An existing environment keeps its image until
-you destroy it and start it again, which discards its database and your changes in the container.
+`start` prints the wiki's URL and the admin login. To use other versions, pass flags such as `--mw 1.45 --php 8.4` to
+`start`; they apply when the environment is created, so destroy it to change them. The first `start` for a MediaWiki
+and PHP version builds images, which takes a few minutes; later environments are ready in under a minute. `mwenv help`
+lists all commands and flags.
 
 ## Add other extensions
 
@@ -77,9 +79,9 @@ mwenv stop && mwenv start
 It stays until you destroy the environment. Use `--root` only for changes to the container: on Linux, files it
 creates in your worktree do not belong to you.
 
-## Develop mwenv
+## Pick up new MediaWiki commits
 
-You need Go 1.21 or later, which downloads the Go version mwenv needs. Run the tests with `go test ./...`.
-
-Pushing a tag such as `v1.0.0` makes CI attach the binaries to a new release. Never move or reuse a tag: Go's module
-proxy keeps serving the commit it first saw for each tag.
+Images built from a branch, such as `--mw 1.45` (`REL1_45`) or `master`, keep the commit the branch had when they were
+built. To rebuild them from the branch's newest commits and the newest PHP base image, run `mwenv rebuild` with the
+`--mw` and `--php` you pass to `start`. New environments use the new images; an existing environment keeps its image
+until you destroy it and start it again, which discards its database and your changes in the container.
