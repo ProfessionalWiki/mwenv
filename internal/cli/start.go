@@ -46,7 +46,7 @@ func (a app) start(args []string) error {
 
 	env, err := a.startLocked(p, options)
 	if err == nil && p.NeedsComposerInstall() {
-		a.progress("your require-dev is not installed; for Composer scripts that call its tools, run mwenv run -- composer install")
+		a.progress("your require-dev is not installed; before running Composer scripts that call its tools, run mwenv run -- composer install")
 	}
 
 	if !options.json {

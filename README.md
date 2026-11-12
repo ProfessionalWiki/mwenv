@@ -52,8 +52,8 @@ mwenv destroy
 and PHP version builds images, which takes a few minutes; later environments are ready in under a minute. `mwenv help`
 lists all commands and flags.
 
-Composer scripts that call tools from your `require-dev`, such as linters and Phan, need `mwenv run -- composer install`
-first; it creates `vendor/` in your worktree.
+To run Composer scripts that call tools from your `require-dev`, such as linters and Phan, first run
+`mwenv run -- composer install`; it creates `vendor/` in your worktree.
 
 ## Add other extensions
 
