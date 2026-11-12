@@ -117,12 +117,19 @@ func TestNeedsComposerInstallWhileDevDependenciesAreNotInstalled(t *testing.T) {
 func TestDoesNotNeedComposerInstallOnceVendorExists(t *testing.T) {
 	root := extensionWithComposerJson(t, `{ "require-dev": { "php-parallel-lint/php-parallel-lint": "1.4.0" } }`)
 	mkdir(t, filepath.Join(root, "vendor"))
+	writeFile(t, filepath.Join(root, "vendor"), "autoload.php", "<?php")
 
 	assertSame(t, false, detect(t, root).NeedsComposerInstall())
 }
 
 func TestDoesNotNeedComposerInstallWithoutDevDependencies(t *testing.T) {
 	root := extensionWithComposerJson(t, `{ "require": { "php": ">=8.1" } }`)
+
+	assertSame(t, false, detect(t, root).NeedsComposerInstall())
+}
+
+func TestDoesNotNeedComposerInstallWithEmptyDevDependencies(t *testing.T) {
+	root := extensionWithComposerJson(t, `{ "require-dev": {} }`)
 
 	assertSame(t, false, detect(t, root).NeedsComposerInstall())
 }
