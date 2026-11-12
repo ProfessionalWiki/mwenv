@@ -108,6 +108,47 @@ func TestLinkedWorktreeReportsMainRepositoryGitDir(t *testing.T) {
 	assertSame(t, filepath.Join(root, ".git"), p.ExternalGitDir)
 }
 
+func TestNeedsComposerInstallWhileDevDependenciesAreNotInstalled(t *testing.T) {
+	root := extensionWithComposerJson(t, `{ "require-dev": { "php-parallel-lint/php-parallel-lint": "1.4.0" } }`)
+
+	assertSame(t, true, detect(t, root).NeedsComposerInstall())
+}
+
+func TestDoesNotNeedComposerInstallOnceVendorExists(t *testing.T) {
+	root := extensionWithComposerJson(t, `{ "require-dev": { "php-parallel-lint/php-parallel-lint": "1.4.0" } }`)
+	mkdir(t, filepath.Join(root, "vendor"))
+	writeFile(t, filepath.Join(root, "vendor"), "autoload.php", "<?php")
+
+	assertSame(t, false, detect(t, root).NeedsComposerInstall())
+}
+
+func TestDoesNotNeedComposerInstallWithoutDevDependencies(t *testing.T) {
+	root := extensionWithComposerJson(t, `{ "require": { "php": ">=8.1" } }`)
+
+	assertSame(t, false, detect(t, root).NeedsComposerInstall())
+}
+
+func TestDoesNotNeedComposerInstallWithEmptyDevDependencies(t *testing.T) {
+	root := extensionWithComposerJson(t, `{ "require-dev": {} }`)
+
+	assertSame(t, false, detect(t, root).NeedsComposerInstall())
+}
+
+func TestDoesNotNeedComposerInstallWithoutComposerJson(t *testing.T) {
+	root := newRepo(t)
+	writeFile(t, root, "extension.json", `{ "name": "PageApprovals" }`)
+
+	assertSame(t, false, detect(t, root).NeedsComposerInstall())
+}
+
+func extensionWithComposerJson(t *testing.T, composerJson string) string {
+	t.Helper()
+	root := newRepo(t)
+	writeFile(t, root, "extension.json", `{ "name": "PageApprovals" }`)
+	writeFile(t, root, "composer.json", composerJson)
+	return root
+}
+
 func detect(t *testing.T, dir string) project.Project {
 	t.Helper()
 	p, err := project.Detect(dir)

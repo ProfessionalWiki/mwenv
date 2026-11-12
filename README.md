@@ -7,7 +7,7 @@ skin's repository; you don't need a MediaWiki installation of your own.
 
 - You can run several wikis at once, one per git worktree, each with its own database and port.
 - The wiki runs your code in place: edits show on the next reload.
-- Creating an environment installs your extension's or skin's Composer dependencies.
+- Creating an environment installs your extension's or skin's Composer dependencies, except `require-dev`.
 - You choose the MediaWiki version (`master` included), the PHP version, and MariaDB or SQLite.
 - Coding agents can use it unattended: no command asks for input.
 
@@ -51,6 +51,9 @@ mwenv destroy
 `start`; they apply when the environment is created, so destroy it to change them. The first `start` for a MediaWiki
 and PHP version builds images, which takes a few minutes; later environments are ready in under a minute. `mwenv help`
 lists all commands and flags.
+
+To run Composer scripts that call tools from your `require-dev`, such as linters and Phan, first run
+`mwenv run -- composer install`; it creates `vendor/` in your worktree.
 
 ## Add other extensions
 

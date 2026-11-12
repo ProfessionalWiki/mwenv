@@ -3,7 +3,9 @@ package project
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -38,6 +40,23 @@ func (p Project) Dir() string {
 		return "skins/" + p.Name
 	}
 	return "extensions/" + p.Name
+}
+
+func (p Project) NeedsComposerInstall() bool {
+	content, err := os.ReadFile(filepath.Join(p.Root, "composer.json"))
+	if err != nil {
+		return false
+	}
+
+	var composer struct {
+		RequireDev map[string]string `json:"require-dev"`
+	}
+	if json.Unmarshal(content, &composer) != nil || len(composer.RequireDev) == 0 {
+		return false
+	}
+
+	_, err = os.Stat(filepath.Join(p.Root, "vendor"))
+	return errors.Is(err, fs.ErrNotExist)
 }
 
 func Detect(dir string) (Project, error) {
