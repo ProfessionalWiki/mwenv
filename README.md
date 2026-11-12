@@ -34,7 +34,8 @@ Or, with [mise](https://mise.jdx.dev):
 mise use -g github:ProfessionalWiki/mwenv
 ```
 
-To upgrade, run the install command again.
+To upgrade, run the install command again. When an upgrade changes the images, the next `start` for each MediaWiki and
+PHP version builds new ones. `destroy` and `rebuild` remove the old images once no environment uses them.
 
 ## Use
 
