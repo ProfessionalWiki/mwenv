@@ -64,8 +64,11 @@ jobs:
           "$RUNNER_TEMP/mwenv" run -- php ../../maintenance/run.php showSiteStats
           "$RUNNER_TEMP/mwenv" stop
           "$RUNNER_TEMP/mwenv" start
+          # A tag as another version of mwenv names its images, which destroy removes once no container uses them.
+          docker tag "$(docker image ls --format '{{.Repository}}:{{.Tag}}' mwenv-core | head -n 1)" mwenv-core:smoke-00000000
           "$RUNNER_TEMP/mwenv" destroy
           test "$("$RUNNER_TEMP/mwenv" ls --json)" = "[]"
+          test -z "$(docker image ls --quiet mwenv-core:smoke-00000000)"
       # Only where the images were just built: loaded images come without the build cache, so a rebuild would take
       # minutes.
       - name: Rebuild the images under an existing environment

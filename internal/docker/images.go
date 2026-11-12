@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"embed"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -20,8 +21,11 @@ var buildFiles embed.FS
 
 var phpVersionPattern = regexp.MustCompile(`^[0-9]+(\.[0-9]+){1,2}([.-][A-Za-z0-9]+)*$`)
 
-// imageLabel marks the images mwenv builds, so that PruneImages finds the ones a rebuild replaced.
+// imageLabel marks the images mwenv builds, so that PruneImages finds the ones it no longer uses.
 const imageLabel = "wiki.professional.mwenv=true"
+
+// buildHashPattern matches the hash of the build files at the end of an image tag.
+var buildHashPattern = regexp.MustCompile(`-([0-9a-f]{8})$`)
 
 func ValidatePHPVersion(version string) error {
 	if !phpVersionPattern.MatchString(version) {
@@ -95,16 +99,59 @@ func buildCoreImage(version mediawiki.Version, php string, onBuild func(image st
 	return build(CoreImage(version, php), "core.Dockerfile", buildArgs, onBuild, flags...)
 }
 
-// PruneImages removes the images mwenv built that lost their tag to a rebuild and that no container uses. Docker's
-// classic image store keeps such images; its containerd image store removes them when the tag moves.
+// PruneImages removes the images mwenv built that no container uses and that this version of mwenv would not use:
+// those that other versions of mwenv built from other build files, and those that lost their tag to a rebuild.
+// Docker's classic image store keeps the latter; its containerd image store removes them when the tag moves.
 func PruneImages() error {
+	otherBuildsErr := removeOtherBuilds()
+
 	_, err := output("image", "prune", "--force", "--filter", "label="+imageLabel)
 	// Docker runs one prune at a time, which parallel destroys in several worktrees run into. The prune that runs
 	// does this one's work, and whatever it misses the next prune removes.
 	if err != nil && strings.Contains(err.Error(), "a prune operation is already running") {
-		return nil
+		err = nil
 	}
-	return err
+	return errors.Join(otherBuildsErr, err)
+}
+
+// removeOtherBuilds removes the tags of the images built from other build files. Docker and Podman refuse to remove
+// an image that a container uses, so an environment that another version of mwenv created keeps its image until it
+// is destroyed. Podman only untags a PHP image that a core image is built on, which leaves it to the prune.
+func removeOtherBuilds() error {
+	listing, err := output("image", "ls", "--filter", "label="+imageLabel, "--format", "{{.Repository}}:{{.Tag}}")
+	if err != nil {
+		return err
+	}
+
+	for _, image := range otherBuilds(listing, currentHashes()) {
+		// A failure, such as the refusal for an image in use, leaves the image to a later prune.
+		_, _ = output("image", "rm", image)
+	}
+	return nil
+}
+
+// currentHashes maps the repository of each image to the hash that this version of mwenv puts in its tags.
+func currentHashes() map[string]string {
+	return map[string]string{"mwenv-php": phpHash(), "mwenv-core": coreHash()}
+}
+
+// otherBuilds returns the images in a listing of repository:tag lines whose tag ends with another hash than the
+// current one of their repository. Podman lists local images under localhost/.
+func otherBuilds(listing string, hashes map[string]string) []string {
+	var images []string
+	for _, line := range strings.Split(listing, "\n") {
+		image := strings.TrimSpace(line)
+		separator := strings.LastIndex(image, ":")
+		if separator < 0 {
+			continue
+		}
+		current, ours := hashes[strings.TrimPrefix(image[:separator], "localhost/")]
+		match := buildHashPattern.FindStringSubmatch(image[separator+1:])
+		if ours && match != nil && match[1] != current {
+			images = append(images, image)
+		}
+	}
+	return images
 }
 
 func imageExists(tag string) bool {
